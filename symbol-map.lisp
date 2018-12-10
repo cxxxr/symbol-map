@@ -117,11 +117,10 @@
    (setf pathname (absolute-pathname pathname))
    (let ((pathname/definitions-table (make-hash-table :test 'equal)))
      (loop :for (pathname . def) :in (who-references-list pathname pathnames)
-       :do (push def
-                 (gethash pathname
-                          pathname/definitions-table)))
-     (print-pathname/definitions-table pathname/definitions-table))
-   (values)))
+           :do (push def
+                     (gethash pathname
+                              pathname/definitions-table)))
+     (alexandria:hash-table-alist pathname/definitions-table))))
 
 (export
  (defun depends-on (pathname &optional (pathnames (lisp-files)))
@@ -133,8 +132,7 @@
        (push def
              (gethash (definition-pathname def)
                       pathname/definitions-table)))
-     (print-pathname/definitions-table pathname/definitions-table)
-     (values))))
+     (alexandria:hash-table-alist pathname/definitions-table))))
 
 (defun file-graph-output (stream pathnames)
   (format stream "~&digraph {~%")
