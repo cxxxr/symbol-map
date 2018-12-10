@@ -1,5 +1,5 @@
 (asdf:defsystem symbol-map
-  :depends-on (:sb-introspect :uiop :alexandria :cl-fad)
+  :depends-on (:alexandria :cl-fad :optima)
   :serial t
   :components ((:file "package")
                (:file "util")

@@ -2,44 +2,27 @@
 
 (in-package :symbol-map)
 
-(defparameter *definition-types*
-  '(:variable
-    :constant
-    :type
-    :symbol-macro
-    :macro
-    :compiler-macro
-    :function
-    :generic-function
-    :method
-    :setf-expander
-    :structure
-    :condition
-    :class
-    :method-combination
-    :package
-    :transform
-    :optimizer
-    :vop
-    :source-transform
-    :ir1-convert
-    :declaration
-    :alien-type))
-
 (defstruct definition
-  type
   symbol
   pathname
-  form-path)
+  form-path
+  (position 0)
+  form)
 
 (defun collect-definitions (name)
-  (loop :for type :in *definition-types* :append
-    (loop :for def :in (sb-introspect:find-definition-sources-by-name name type) :collect
-      (make-definition
-       :type type
-       :symbol name
-       :pathname (sb-introspect:definition-source-pathname def)
-       :form-path (sb-introspect:definition-source-form-path def)))))
+  (when (member name '(initialize-instance print-object))
+    (return-from collect-definitions))
+  (loop :for definition-form :in (let ((swank::*buffer-package* (find-package :cl-user))
+                                       (swank::*buffer-readtable* *readtable*))
+                                   (mapcar #'swank::xref>elisp (swank::find-definitions name)))
+        :collect (let ((definition (make-definition :symbol name :form (first definition-form))))
+                   (loop :for x :in (cdr (assoc :location (rest definition-form)))
+                         :do (optima:match x
+                               ((list :file filename)
+                                (setf (definition-pathname definition) (probe-file filename)))
+                               ((list :position position)
+                                (setf (definition-position definition) position))))
+                   definition)))
 
 (defstruct filenode
   (id (gensym))
@@ -57,11 +40,7 @@
              (list def)
              definitions
              #'<
-             :key (lambda (def)
-                    (let ((form-path (definition-form-path def)))
-                      (if (null form-path)
-                          0
-                          (car form-path)))))))
+             :key #'definition-position)))
 
 (defun add-definitions (filenode symbol pathnames)
   (dolist (def (collect-definitions symbol))
@@ -127,13 +106,10 @@
   (maphash (lambda (pathname definitions)
              (format t "~&~A~%" pathname)
              (dolist (def (sort definitions #'<
-                                :key (lambda (def)
-                                       (or (car (definition-form-path def))
-                                           0))))
+                                :key #'definition-position))
                (format t
-                       "~2T~A (~A)~%"
-                       (definition-symbol def)
-                       (definition-type def))))
+                       "~2T~A~%"
+                       (definition-symbol def))))
            table))  
 
 (export
